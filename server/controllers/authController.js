@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const signUpController = async () => {};
+const signUpController = async () => {
+
+};
 
 const signInController = async () => {};
 

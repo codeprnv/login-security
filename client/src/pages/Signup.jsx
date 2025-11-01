@@ -13,11 +13,7 @@ const Signup = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(formData);
-   
-  };
+  
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 ">
@@ -27,7 +23,7 @@ const Signup = () => {
           Enter your details below to create your account
         </p>
 
-        <form className=" space-y-3" onSubmit={handleSubmit}>
+        <form className="space-y-3" >
           <div>
             <label htmlFor="firstname" className="block text-sm font-medium text-gray-700">
               First Name
@@ -37,6 +33,7 @@ const Signup = () => {
               id="firstname"
               name="firstname"
               placeholder="Harsh"
+              value={formData.firstname}
               onChange={onChangeHandler}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
@@ -51,6 +48,7 @@ const Signup = () => {
               id="lastname"
               name="lastname"
               placeholder="Vishwakarma"
+              value={formData.lastname}
               onChange={onChangeHandler}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
@@ -65,6 +63,7 @@ const Signup = () => {
               id="mobile"
               name="mobile"
               placeholder="727847482"
+              value={formData.mobile}
               onChange={onChangeHandler}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
@@ -79,6 +78,7 @@ const Signup = () => {
               id="email"
               name="email"
               placeholder="m@example.com"
+              value={formData.email}
               onChange={onChangeHandler}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
@@ -93,6 +93,7 @@ const Signup = () => {
               id="password"
               name="password"
               placeholder="********"
+              value={formData.password}
               onChange={onChangeHandler}
               className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
