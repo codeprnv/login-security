@@ -13,6 +13,12 @@ const Signup = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleSubmit = async(e) => {
+    e.preventDefault();
+    console.log("Form submitted!");
+    console.log(formData);
+  };
+
   
 
   return (
@@ -23,7 +29,7 @@ const Signup = () => {
           Enter your details below to create your account
         </p>
 
-        <form className="space-y-3" >
+        <form className="space-y-3" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="firstname" className="block text-sm font-medium text-gray-700">
               First Name
