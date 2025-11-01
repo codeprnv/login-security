@@ -136,9 +136,9 @@ const UserSchema = new mongoose.Schema(
   }
 );
 
-// Index for email and username for faster queries
-UserSchema.index({ email: 1 });
-UserSchema.index({ username: 1 });
+// // Index for email and username for faster queries
+// UserSchema.index({ email: 1 });
+// UserSchema.index({ username: 1 });
 
 // Pre-save middleware to hash password before saving
 UserSchema.pre('save', async function (next) {
@@ -158,13 +158,19 @@ UserSchema.pre('save', async function (next) {
 });
 
 // Method to compare password during login
+// In User.js, ensure this method exists:
 UserSchema.methods.comparePassword = async function (candidatePassword) {
   try {
-    return await bcrypt.compare(candidatePassword, this.password);
+    console.log('🔐 Comparing password for user:', this.email);
+    const result = await bcrypt.compare(candidatePassword, this.password);
+    console.log('✅ Password match result:', result);
+    return result;
   } catch (error) {
+    console.error('❌ Password comparison failed:', error);
     throw new Error('Password comparison failed');
   }
 };
+
 
 // Method to check if password is expired
 UserSchema.methods.isPasswordExpired = function () {

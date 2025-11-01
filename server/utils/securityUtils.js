@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import geoip from 'geoip-lite';
 import nodemailer from 'nodemailer';
 import LoginLog from '../models/LoginLog.js';
@@ -148,7 +149,7 @@ export const sendSuspiciousLoginAlert = async (
 ) => {
   try {
     // Generate verification token for email links
-    const verificationToken = require('crypto').randomBytes(32).toString('hex');
+    const verificationToken = crypto.randomBytes(32).toString('hex');
 
     // Store token temporarily (in production, use Redis or database)
     // For now, we'll include it in the email link

@@ -1,8 +1,10 @@
 // import axios from 'axios';
+import bcrypt from 'bcryptjs';
 import geoip from 'geoip-lite';
 import jwt from 'jsonwebtoken';
+import qrCode from 'qrcode';
 import speakeasy from 'speakeasy';
-import UAParser from 'ua-parser-js';
+import { UAParser } from 'ua-parser-js';
 import LoginLog from '../models/LoginLog.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
@@ -11,210 +13,211 @@ import {
   logLoginAttempt,
   sendSuspiciousLoginAlert
 } from '../utils/securityUtils.js';
-import qrCode from qrcode;
 
-    const signUpController = async (req, res) => {
-        try {
-          const { email, username, password, confirmPassword } = req.body;
-      
-          // Validation: Check if all fields are provided
-          if (!email || !username || !password || !confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              error: 'All fields are required: email, username, password, confirmPassword'
-            });
-          }
-      
-          // Validation: Check if passwords match
-          if (password !== confirmPassword) {
-            return res.status(400).json({
-              success: false,
-              error: 'Passwords do not match'
-            });
-          }
-      
-          // Validation: Email format check
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(email)) {
-            return res.status(400).json({
-              success: false,
-              error: 'Invalid email format'
-            });
-          }
-      
-          // Validation: Password strength requirements
-          const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-          if (!passwordRegex.test(password)) {
-            return res.status(400).json({
-              success: false,
-              error: 'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
-            });
-          }
-      
-          // Validation: Username length and format
-          if (username.length < 3 || username.length > 20) {
-            return res.status(400).json({
-              success: false,
-              error: 'Username must be between 3 and 20 characters'
-            });
-          }
-      
-          if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-            return res.status(400).json({
-              success: false,
-              error: 'Username can only contain letters, numbers, underscores, and hyphens'
-            });
-          }
-      
-          // Check if user already exists (email)
-          const existingUserByEmail = await User.findOne({
-            email: email.toLowerCase()
-          });
-      
-          if (existingUserByEmail) {
-            return res.status(409).json({
-              success: false,
-              error: 'Email already registered. Please try logging in or use a different email'
-            });
-          }
-      
-          // Check if user already exists (username)
-          const existingUserByUsername = await User.findOne({
-            username: username.toLowerCase()
-          });
-      
-          if (existingUserByUsername) {
-            return res.status(409).json({
-              success: false,
-              error: 'Username already taken. Please choose a different username'
-            });
-          }
-      
-          // List of common passwords to reject
-          const commonPasswords = [
-            'password', '123456', '12345678', 'qwerty', 'abc123',
-            'password123', 'admin', 'letmein', 'welcome', 'monkey'
-          ];
-      
-          if (commonPasswords.includes(password.toLowerCase())) {
-            return res.status(400).json({
-              success: false,
-              error: 'Password is too common. Please choose a stronger password'
-            });
-          }
-      
-          // Hash the password using bcrypt (12 rounds for strong security)
-          // Note: User.js should have a pre-save hook to hash this automatically
-          // But we can also hash it here for explicit control
-          const hashedPassword = await bcrypt.hash(password, 12);
-      
-          // Create new user document
-          const newUser = new User({
-            email: email.toLowerCase(),
-            username: username.toLowerCase(),
-            password: hashedPassword,
-            passwordChangedAt: new Date(),
-            // Password expires in 90 days
-            passwordExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
-            // Initialize empty password history
-            passwordHistory: [],
-            // MFA disabled by default
-            mfaEnabled: false,
-            mfaMethod: null,
-            // Biometrics and passkeys arrays start empty
-            passkeys: [],
-            // Account security fields
-            accountLocked: false,
-            failedLoginAttempts: 0,
-            // Role set to 'user' by default
-            role: 'user'
-          });
-      
-          // Save user to database
-          await newUser.save();
-      
-          // Log successful registration
-          console.log(`New user registered: ${email} with username: ${username}`);
-      
-          // Optional: Send welcome email
-          // await sendWelcomeEmail(email, username);
-      
-          // Return success response with user info (excluding sensitive data)
-          return res.status(201).json({
-            success: true,
-            message: 'User registered successfully. Please log in to continue.',
-            user: {
-              id: newUser._id,
-              email: newUser.email,
-              username: newUser.username,
-              role: newUser.role
-            }
-          });
-      
-        } catch (error) {
-          // Handle duplicate key errors more gracefully
-          if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
-            return res.status(409).json({
-              success: false,
-              error: `${field} already exists. Please use a different ${field}`
-            });
-          }
-      
-          // Handle validation errors from schema
-          if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({
-              success: false,
-              error: messages.join(', ')
-            });
-          }
-      
-          // Generic error handler
-          console.error('Signup error:', error);
-          return res.status(500).json({
-            success: false,
-            error: 'An error occurred during registration. Please try again later.'
-          });
-        }
-      };
+const signUpController = async (req, res) => {
+  try {
+    const { email, username, password, confirmPassword } = req.body;
+
+    // Validation
+    if (!email || !username || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'All fields are required: email, username, password, confirmPassword',
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Passwords do not match',
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format',
+      });
+    }
+
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Password must be at least 8 characters with uppercase, lowercase, number, and special character',
+      });
+    }
+
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username must be between 3 and 20 characters',
+      });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Username can only contain letters, numbers, underscores, and hyphens',
+      });
+    }
+
+    // Check existing users
+    const existingUserByEmail = await User.findOne({
+      email: email.toLowerCase(),
+    });
+
+    if (existingUserByEmail) {
+      return res.status(409).json({
+        success: false,
+        error: 'Email already registered',
+      });
+    }
+
+    const existingUserByUsername = await User.findOne({
+      username: username.toLowerCase(),
+    });
+
+    if (existingUserByUsername) {
+      return res.status(409).json({
+        success: false,
+        error: 'Username already taken',
+      });
+    }
+
+    // Check common passwords
+    const commonPasswords = [
+      'password',
+      '123456',
+      '12345678',
+      'qwerty',
+      'abc123',
+      'password123',
+      'admin',
+      'letmein',
+      'welcome',
+      'monkey',
+    ];
+
+    if (commonPasswords.includes(password.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is too common',
+      });
+    }
+
+    // ❌ REMOVE THIS - DON'T hash here, let User.js pre-save hook do it
+    // const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create new user - let pre-save hook handle hashing
+    const newUser = new User({
+      email: email.toLowerCase(),
+      username: username.toLowerCase(),
+      password: password, // ✅ PASS RAW PASSWORD - pre-save hook will hash it
+      passwordChangedAt: new Date(),
+      passwordExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+      passwordHistory: [],
+      mfaEnabled: false,
+      mfaMethod: null,
+      passkeys: [],
+      accountLocked: false,
+      failedLoginAttempts: 0,
+      role: 'user',
+    });
+
+    // Save user - pre-save hook will hash password
+    await newUser.save();
+
+    console.log(`✅ New user registered: ${email} with username: ${username}`);
+
+    return res.status(201).json({
+      success: true,
+      message: 'User registered successfully. Please log in to continue.',
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        username: newUser.username,
+        role: newUser.role,
+      },
+    });
+  } catch (error) {
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({
+        success: false,
+        error: `${field} already exists`,
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err) => err.message);
+      return res.status(400).json({
+        success: false,
+        error: messages.join(', '),
+      });
+    }
+
+    console.error('❌ Signup error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Registration failed',
+    });
+  }
+};
+
       
 
       const signInController = async (req, res) => {
         try {
           const { email, password, mfaCode } = req.body;
-      
-          // Validate input
-          if (!email || !password) {
-            return res.status(400).json({
-              success: false,
-              error: 'Email and password are required'
-            });
-          }
-      
-          // Extract device info
-          const userAgent = req.headers['user-agent'];
-          const ipAddress = req.ip || req.connection.remoteAddress;
+
+          // FIXED: Better IP extraction
+          const getClientIp = (req) => {
+            return (
+              req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+              req.headers['x-real-ip'] ||
+              req.socket?.remoteAddress ||
+              req.ip ||
+              'Unknown'
+            );
+          };
+
+          const ipAddress = getClientIp(req);
+          console.log('🔍 IP Address extracted:', ipAddress);
+
+          // Extract geolocation
           const geo = geoip.lookup(ipAddress);
-      
-          // Parse user agent to get device details
+          console.log('📍 Geolocation result:', geo);
+
+          // Parse user agent
+          const userAgent = req.headers['user-agent'];
           const parser = new UAParser(userAgent);
           const result = parser.getResult();
-      
+
           const deviceInfo = {
             userAgent: userAgent,
             browser: result.browser.name || 'Unknown',
             os: result.os.name || 'Unknown',
-            deviceType: result.device.type || 'desktop'
+            deviceType: result.device.type || 'desktop',
           };
-      
-          // Find user
-          const user = await User.findOne({ email: email.toLowerCase() });
-      
+
+          console.log('📱 Device info:', deviceInfo);
+
+          // Find user - TRIM and LOWERCASE
+          const email_normalized = email.trim().toLowerCase();
+          const user = await User.findOne({ email: email_normalized });
+
           if (!user) {
+            console.log('❌ User not found:', email_normalized);
             await logLoginAttempt(
               null,
-              email,
+              email_normalized,
               ipAddress,
               deviceInfo,
               geo,
@@ -225,15 +228,18 @@ import qrCode from qrcode;
             );
             return res.status(401).json({
               success: false,
-              error: 'Invalid credentials'
+              error: 'Invalid credentials',
             });
           }
-      
+
+          console.log('✅ User found:', user.email);
+
           // Check account lock
           if (user.accountLocked && user.lockedUntil > new Date()) {
+            console.log('🔒 Account locked:', user.email);
             await logLoginAttempt(
               user._id,
-              email,
+              email_normalized,
               ipAddress,
               deviceInfo,
               geo,
@@ -245,25 +251,39 @@ import qrCode from qrcode;
             return res.status(423).json({
               success: false,
               error: 'Account locked',
-              unlocksAt: user.lockedUntil
+              unlocksAt: user.lockedUntil,
             });
           }
-      
-          // Verify password using User model method
-          const validPassword = await user.comparePassword(password);
-      
+
+          // Verify password - FIXED
+          console.log('🔐 Comparing passwords...');
+          let validPassword = false;
+
+          try {
+            validPassword = await user.comparePassword(password.trim());
+            console.log('✅ Password validation result:', validPassword);
+          } catch (compareError) {
+            console.error(
+              '❌ Password comparison error:',
+              compareError.message
+            );
+            validPassword = false;
+          }
+
           if (!validPassword) {
+            console.log('❌ Invalid password for:', email_normalized);
             user.failedLoginAttempts += 1;
-      
+
             if (user.failedLoginAttempts >= 5) {
               user.accountLocked = true;
-              user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+              user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+              console.log('🔒 Account locked due to failed attempts');
             }
-      
+
             await user.save();
             await logLoginAttempt(
               user._id,
-              email,
+              email_normalized,
               ipAddress,
               deviceInfo,
               geo,
@@ -272,31 +292,35 @@ import qrCode from qrcode;
               false,
               ['Invalid password']
             );
-      
+
             return res.status(401).json({
               success: false,
-              error: 'Invalid credentials'
+              error: 'Invalid credentials',
             });
           }
-      
+
           // Check password expiry
           if (user.isPasswordExpired()) {
+            console.log('⏰ Password expired for:', email_normalized);
             return res.status(403).json({
               success: false,
               error: 'Password expired',
-              requiresReset: true
+              requiresReset: true,
             });
           }
-      
+
           // Suspicious login detection
+          console.log('🔍 Checking for suspicious login...');
           const suspiciousReasons = await detectSuspiciousLogin(
             user,
             ipAddress,
             geo
           );
-      
-          if (suspiciousReasons) {
-            // Send alert to user
+
+          if (suspiciousReasons && suspiciousReasons.length > 0) {
+            console.log('⚠️ Suspicious login detected:', suspiciousReasons);
+
+            // Send alert
             await sendSuspiciousLoginAlert(
               user,
               ipAddress,
@@ -304,10 +328,10 @@ import qrCode from qrcode;
               geo,
               suspiciousReasons
             );
-      
+
             await logLoginAttempt(
               user._id,
-              email,
+              email_normalized,
               ipAddress,
               deviceInfo,
               geo,
@@ -316,42 +340,43 @@ import qrCode from qrcode;
               false,
               suspiciousReasons
             );
-      
+
             return res.status(403).json({
               success: false,
               error: 'Suspicious login detected',
               requiresAdditionalVerification: true,
-              suspiciousReasons: suspiciousReasons
+              suspiciousReasons: suspiciousReasons,
             });
           }
-      
+
           // MFA verification
           if (user.mfaEnabled) {
             if (!mfaCode) {
+              console.log('📱 MFA required for:', email_normalized);
               return res.status(403).json({
                 success: false,
                 error: 'MFA code required',
-                mfaMethod: user.mfaMethod
+                mfaMethod: user.mfaMethod,
               });
             }
-      
+
             const verified = speakeasy.totp.verify({
               secret: user.mfaSecret,
               encoding: 'base32',
               token: mfaCode,
-              window: 2
+              window: 2,
             });
-      
+
             if (!verified) {
-              // Check backup codes
               const backupCodeIndex = user.backupCodes.findIndex(
                 (bc) => bc.code === mfaCode && !bc.used
               );
-      
+
               if (backupCodeIndex === -1) {
+                console.log('❌ Invalid MFA code for:', email_normalized);
                 await logLoginAttempt(
                   user._id,
-                  email,
+                  email_normalized,
                   ipAddress,
                   deviceInfo,
                   geo,
@@ -362,38 +387,38 @@ import qrCode from qrcode;
                 );
                 return res.status(401).json({
                   success: false,
-                  error: 'Invalid MFA code'
+                  error: 'Invalid MFA code',
                 });
               }
-      
-              // Mark backup code as used
+
               user.backupCodes[backupCodeIndex].used = true;
               user.backupCodes[backupCodeIndex].usedAt = new Date();
               await user.save();
             }
           }
-      
-          // Reset failed attempts on successful login
+
+          // Reset failed attempts
           user.failedLoginAttempts = 0;
           user.accountLocked = false;
           await user.save();
-      
+          console.log('✅ Account unlocked and attempts reset');
+
           // Generate tokens
           const accessToken = jwt.sign(
             { userId: user._id, email: user.email, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: '15m' }
           );
-      
+
           const refreshToken = jwt.sign(
             { userId: user._id },
             process.env.REFRESH_TOKEN_SECRET,
             { expiresIn: '7d' }
           );
-      
+
           // Save session
           const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-      
+
           await Session.create({
             userId: user._id,
             refreshToken: hashedRefreshToken,
@@ -404,16 +429,15 @@ import qrCode from qrcode;
                   country: geo.country,
                   city: geo.city,
                   latitude: geo.ll[0],
-                  longitude: geo.ll[1]
+                  longitude: geo.ll[1],
                 }
               : {},
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           });
-      
+
           // Log successful login
           await logLoginAttempt(
             user._id,
-            email,
+            email_normalized,
             ipAddress,
             deviceInfo,
             geo,
@@ -421,15 +445,17 @@ import qrCode from qrcode;
             false,
             user.mfaEnabled
           );
-      
+
+          console.log('✅ Login successful for:', email_normalized);
+
           // Set refresh token in HttpOnly cookie
           res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            maxAge: 7 * 24 * 60 * 60 * 1000,
           });
-      
+
           return res.status(200).json({
             success: true,
             message: 'Login successful',
@@ -438,17 +464,18 @@ import qrCode from qrcode;
               id: user._id,
               email: user.email,
               username: user.username,
-              role: user.role
-            }
+              role: user.role,
+            },
           });
         } catch (error) {
-          console.error('Login error:', error);
+          console.error('❌ Login error:', error);
           return res.status(500).json({
             success: false,
-            error: 'Login failed. Please try again later.'
+            error: 'Login failed. Please try again later.',
           });
         }
       };
+      
       
 
 const mfaSetupController = async (req, res) => {
