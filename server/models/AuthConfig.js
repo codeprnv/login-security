@@ -1,11 +1,10 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
-// models/AuthConfig.js
 const authConfigSchema = new mongoose.Schema({
-  methodName: { 
-    type: String, 
+  methodName: {
+    type: String,
     enum: ['password', 'mfa', 'biometrics', 'passkeys'],
-    unique: true 
+    unique: true,
   },
   isEnabled: { type: Boolean, default: true },
   isRequired: { type: Boolean, default: false },
@@ -15,9 +14,9 @@ const authConfigSchema = new mongoose.Schema({
     sessionTimeoutMinutes: Number,
     maxConcurrentSessions: Number,
     maxFailedAttempts: Number,
-    lockoutDurationMinutes: Number
-  }
+    lockoutDurationMinutes: Number,
+  },
 });
 
 const AuthConfig = mongoose.model('AuthConfig', authConfigSchema);
-export default AuthConfig
+export default AuthConfig;

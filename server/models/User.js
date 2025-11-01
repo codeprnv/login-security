@@ -72,8 +72,8 @@ UserSchema.pre('save', async function (next) {
 });
 
 UserSchema.methods.comparePassword = async function (candidatePassword) {
-    return bcrypt.compare(candidatePassword, this.password);
-}
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 const User = mongoose.model('User', UserSchema);
 export default User;

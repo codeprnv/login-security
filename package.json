@@ -7,12 +7,15 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "client": "npm --prefix client run dev",
     "server": "npm --prefix server run dev",
-    "dev": "concurrently \"npm:client\" \"npm:server\""
+    "dev": "concurrently \"npm:client\" \"npm:server\"",
+    "format": "prettier -w ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.7.1"
   }
 }

@@ -1,0 +1,10 @@
+{
+  "arrowParens": "always",
+  "printWidth": 80,
+  "tabWidth": 2,
+  "semi": true,
+  "trailingComma": "es5",
+  "jsxSingleQuote": true,
+  "singleQuote": true,
+  "plugins": ["prettier-plugin-tailwindcss"]
+}
