@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+@layer base{
+  .body{
+    @apply w-screen min-h-screen min-w-[375px] bg-black/75
+  }
+}
