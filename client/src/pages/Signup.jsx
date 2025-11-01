@@ -13,108 +13,136 @@ const Signup = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async(e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Form submitted!");
-    console.log(formData);
+    console.log("Form Data:", formData);
+    
   };
 
-  
-
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 ">
-      <div className="w-full max-w-sm p-8 bg-white rounded-lg shadow m-10">
-        <h2 className="text-2xl font-semibold text-center mb-2">Create an account</h2>
-        <p className="text-sm text-gray-500 text-center mb-6">
-          Enter your details below to create your account
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full">
+        <h2 className="text-2xl font-semibold mb-4">Create your account</h2>
+        <p className="mb-6 text-gray-600 text-sm">
+          Fill in the form below to get started
         </p>
 
-        <form className="space-y-3" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* First Name */}
           <div>
-            <label htmlFor="firstname" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="firstname"
+              className="block mb-1 text-sm font-medium text-gray-700"
+            >
               First Name
             </label>
             <input
               type="text"
               id="firstname"
               name="firstname"
-              placeholder="Harsh"
               value={formData.firstname}
               onChange={onChangeHandler}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="Harsh"
             />
           </div>
 
+          {/* Last Name */}
           <div>
-            <label htmlFor="lastname" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="lastname"
+              className="block mb-1 text-sm font-medium text-gray-700"
+            >
               Last Name
             </label>
             <input
               type="text"
               id="lastname"
               name="lastname"
-              placeholder="Vishwakarma"
               value={formData.lastname}
               onChange={onChangeHandler}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="Vishwakarma"
             />
           </div>
 
+          {/* Mobile */}
           <div>
-            <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="mobile"
+              className="block mb-1 text-sm font-medium text-gray-700"
+            >
               Mobile
             </label>
             <input
-              type="text"
+              type="tel"
               id="mobile"
               name="mobile"
-              placeholder="727847482"
               value={formData.mobile}
               onChange={onChangeHandler}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="727847482"
             />
           </div>
 
+          {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="email"
+              className="block mb-1 text-sm font-medium text-gray-700"
+            >
               Email
             </label>
             <input
               type="email"
               id="email"
               name="email"
-              placeholder="m@example.com"
               value={formData.email}
               onChange={onChangeHandler}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="m@example.com"
             />
           </div>
 
+          {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
+            <label
+              htmlFor="password"
+              className="flex justify-between mb-1 text-sm font-medium text-gray-700"
+            >
+              <span>Password</span>
+              <a href="#" className="text-xs text-gray-500 hover:underline">
+                Forgot your password?
+              </a>
             </label>
             <input
               type="password"
               id="password"
               name="password"
-              placeholder="********"
               value={formData.password}
               onChange={onChangeHandler}
-              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+              placeholder="********"
             />
           </div>
 
+          {/* Submit button */}
           <button
             type="submit"
-            className="w-full py-2 bg-black text-white rounded-md hover:bg-gray-800 transition"
+            className="w-full bg-black text-white py-2 rounded-md hover:bg-gray-900 transition"
           >
-            Sign up
+            Sign Up
           </button>
 
+          {/* Google signup */}
           <button
             type="button"
-            className="w-full py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 hover:bg-gray-100 transition"
+            className="w-full border border-gray-300 flex items-center justify-center gap-2 py-2 rounded-md hover:bg-gray-100 transition"
           >
             <img
               src="https://www.svgrepo.com/show/475656/google-color.svg"
@@ -125,7 +153,7 @@ const Signup = () => {
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{" "}
           <a href="/login" className="font-medium text-black hover:underline">
             Log in
