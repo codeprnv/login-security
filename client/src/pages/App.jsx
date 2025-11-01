@@ -1,8 +1,19 @@
 import React from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Login from './Login';
+import Signup from './Signup';
+
 
 const App = () => {
   return (
-    <div className='flex items-center justify-center w-full h-screen text-2xl bg-red-400'>App</div>
+    <div>
+      <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+      </Routes>
+    </BrowserRouter>
+    </div>
   )
 }
 
