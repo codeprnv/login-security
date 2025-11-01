@@ -1,8 +1,16 @@
 // import axios from 'axios';
+import geoip from 'geoip-lite';
 import jwt from 'jsonwebtoken';
 import speakeasy from 'speakeasy';
+import UAParser from 'ua-parser-js';
+import LoginLog from '../models/LoginLog.js';
 import Session from '../models/Session.js';
 import User from '../models/User.js';
+import {
+  detectSuspiciousLogin,
+  logLoginAttempt,
+  sendSuspiciousLoginAlert
+} from '../utils/securityUtils.js';
 import qrCode from qrcode;
 
     const signUpController = async (req, res) => {
@@ -172,178 +180,276 @@ import qrCode from qrcode;
       };
       
 
-const signInController = async (req, res) => {
-    try {
-        const { email, password, mfaCode } = req.body;
-        
-        // Extract device info
-        const userAgent = req.headers['user-agent'];
-        const ipAddress = req.ip || req.connection.remoteAddress;
-        const geo = geoip.lookup(ipAddress);
-        
-        // const deviceInfo = {
-        //   userAgent,
-        //   browser: /* parse from userAgent */,
-        //   os: /* parse from userAgent */,
-        //   deviceType: /* detect from userAgent */
-        // };
-        
-        // Find user
-        const user = await User.findOne({ email: email.toLowerCase() });
-        
-        if (!user) {
-          await logLoginAttempt(null, email, ipAddress, deviceInfo, geo, 'failed');
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        
-        // Check account lock
-        if (user.accountLocked && user.lockedUntil > new Date()) {
-          return res.status(423).json({ 
-            error: 'Account locked',
-            unlocksAt: user.lockedUntil 
-          });
-        }
-        
-        // Verify password
-        const validPassword = await User.comparePassword(password, user.password)
-        
-        if (!validPassword) {
-          // Increment failed attempts
-          user.failedLoginAttempts += 1;
-          
-          if (user.failedLoginAttempts >= 5) {
-            user.accountLocked = true;
-            user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min
-          }
-          
-          await user.save();
-          await logLoginAttempt(user._id, email, ipAddress, deviceInfo, geo, 'failed');
-          
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        
-        // Check password expiry
-        if (user.passwordExpiresAt && user.passwordExpiresAt < new Date()) {
-          return res.status(403).json({ 
-            error: 'Password expired',
-            requiresReset: true 
-          });
-        }
-        
-        // Suspicious login detection
-        const isSuspicious = await detectSuspiciousLogin(user, ipAddress, geo);
-        
-        if (isSuspicious) {
-          // Send alert email/SMS
-          await sendSuspiciousLoginAlert(user, ipAddress, deviceInfo);
-          
-          // Require additional verification
-          return res.status(403).json({
-            error: 'Suspicious login detected',
-            requiresAdditionalVerification: true
-          });
-        }
-        
-        // MFA verification
-        if (user.mfaEnabled) {
-          if (!mfaCode) {
-            return res.status(403).json({ 
-              error: 'MFA code required',
-              mfaMethod: user.mfaMethod 
+      const signInController = async (req, res) => {
+        try {
+          const { email, password, mfaCode } = req.body;
+      
+          // Validate input
+          if (!email || !password) {
+            return res.status(400).json({
+              success: false,
+              error: 'Email and password are required'
             });
           }
-          
-          const verified = speakeasy.totp.verify({
-            secret: user.mfaSecret,
-            encoding: 'base32',
-            token: mfaCode,
-            window: 2 // Allow 2 time steps for clock skew
-          });
-          
-          if (!verified) {
-            // Check backup codes
-            const backupCode = user.backupCodes.find(
-              bc => bc.code === mfaCode && !bc.used
+      
+          // Extract device info
+          const userAgent = req.headers['user-agent'];
+          const ipAddress = req.ip || req.connection.remoteAddress;
+          const geo = geoip.lookup(ipAddress);
+      
+          // Parse user agent to get device details
+          const parser = new UAParser(userAgent);
+          const result = parser.getResult();
+      
+          const deviceInfo = {
+            userAgent: userAgent,
+            browser: result.browser.name || 'Unknown',
+            os: result.os.name || 'Unknown',
+            deviceType: result.device.type || 'desktop'
+          };
+      
+          // Find user
+          const user = await User.findOne({ email: email.toLowerCase() });
+      
+          if (!user) {
+            await logLoginAttempt(
+              null,
+              email,
+              ipAddress,
+              deviceInfo,
+              geo,
+              'failed',
+              false,
+              false,
+              ['User not found']
             );
-            
-            if (!backupCode) {
-              return res.status(401).json({ error: 'Invalid MFA code' });
+            return res.status(401).json({
+              success: false,
+              error: 'Invalid credentials'
+            });
+          }
+      
+          // Check account lock
+          if (user.accountLocked && user.lockedUntil > new Date()) {
+            await logLoginAttempt(
+              user._id,
+              email,
+              ipAddress,
+              deviceInfo,
+              geo,
+              'failed',
+              false,
+              false,
+              ['Account locked']
+            );
+            return res.status(423).json({
+              success: false,
+              error: 'Account locked',
+              unlocksAt: user.lockedUntil
+            });
+          }
+      
+          // Verify password using User model method
+          const validPassword = await user.comparePassword(password);
+      
+          if (!validPassword) {
+            user.failedLoginAttempts += 1;
+      
+            if (user.failedLoginAttempts >= 5) {
+              user.accountLocked = true;
+              user.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min
             }
-            
-            // Mark backup code as used
-            backupCode.used = true;
-            backupCode.usedAt = new Date();
+      
             await user.save();
+            await logLoginAttempt(
+              user._id,
+              email,
+              ipAddress,
+              deviceInfo,
+              geo,
+              'failed',
+              false,
+              false,
+              ['Invalid password']
+            );
+      
+            return res.status(401).json({
+              success: false,
+              error: 'Invalid credentials'
+            });
           }
+      
+          // Check password expiry
+          if (user.isPasswordExpired()) {
+            return res.status(403).json({
+              success: false,
+              error: 'Password expired',
+              requiresReset: true
+            });
+          }
+      
+          // Suspicious login detection
+          const suspiciousReasons = await detectSuspiciousLogin(
+            user,
+            ipAddress,
+            geo
+          );
+      
+          if (suspiciousReasons) {
+            // Send alert to user
+            await sendSuspiciousLoginAlert(
+              user,
+              ipAddress,
+              deviceInfo,
+              geo,
+              suspiciousReasons
+            );
+      
+            await logLoginAttempt(
+              user._id,
+              email,
+              ipAddress,
+              deviceInfo,
+              geo,
+              'failed',
+              true,
+              false,
+              suspiciousReasons
+            );
+      
+            return res.status(403).json({
+              success: false,
+              error: 'Suspicious login detected',
+              requiresAdditionalVerification: true,
+              suspiciousReasons: suspiciousReasons
+            });
+          }
+      
+          // MFA verification
+          if (user.mfaEnabled) {
+            if (!mfaCode) {
+              return res.status(403).json({
+                success: false,
+                error: 'MFA code required',
+                mfaMethod: user.mfaMethod
+              });
+            }
+      
+            const verified = speakeasy.totp.verify({
+              secret: user.mfaSecret,
+              encoding: 'base32',
+              token: mfaCode,
+              window: 2
+            });
+      
+            if (!verified) {
+              // Check backup codes
+              const backupCodeIndex = user.backupCodes.findIndex(
+                (bc) => bc.code === mfaCode && !bc.used
+              );
+      
+              if (backupCodeIndex === -1) {
+                await logLoginAttempt(
+                  user._id,
+                  email,
+                  ipAddress,
+                  deviceInfo,
+                  geo,
+                  'failed',
+                  false,
+                  false,
+                  ['Invalid MFA code']
+                );
+                return res.status(401).json({
+                  success: false,
+                  error: 'Invalid MFA code'
+                });
+              }
+      
+              // Mark backup code as used
+              user.backupCodes[backupCodeIndex].used = true;
+              user.backupCodes[backupCodeIndex].usedAt = new Date();
+              await user.save();
+            }
+          }
+      
+          // Reset failed attempts on successful login
+          user.failedLoginAttempts = 0;
+          user.accountLocked = false;
+          await user.save();
+      
+          // Generate tokens
+          const accessToken = jwt.sign(
+            { userId: user._id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '15m' }
+          );
+      
+          const refreshToken = jwt.sign(
+            { userId: user._id },
+            process.env.REFRESH_TOKEN_SECRET,
+            { expiresIn: '7d' }
+          );
+      
+          // Save session
+          const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+      
+          await Session.create({
+            userId: user._id,
+            refreshToken: hashedRefreshToken,
+            deviceInfo: deviceInfo,
+            ipAddress: ipAddress,
+            location: geo
+              ? {
+                  country: geo.country,
+                  city: geo.city,
+                  latitude: geo.ll[0],
+                  longitude: geo.ll[1]
+                }
+              : {},
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          });
+      
+          // Log successful login
+          await logLoginAttempt(
+            user._id,
+            email,
+            ipAddress,
+            deviceInfo,
+            geo,
+            'success',
+            false,
+            user.mfaEnabled
+          );
+      
+          // Set refresh token in HttpOnly cookie
+          res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+          });
+      
+          return res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            accessToken: accessToken,
+            user: {
+              id: user._id,
+              email: user.email,
+              username: user.username,
+              role: user.role
+            }
+          });
+        } catch (error) {
+          console.error('Login error:', error);
+          return res.status(500).json({
+            success: false,
+            error: 'Login failed. Please try again later.'
+          });
         }
-        
-        // Reset failed attempts on successful login
-        user.failedLoginAttempts = 0;
-        user.accountLocked = false;
-        await user.save();
-        
-        // Generate tokens
-        const accessToken = jwt.sign(
-          { userId: user._id, email: user.email, role: user.role },
-          process.env.JWT_SECRET,
-          { expiresIn: '15m' }
-        );
-        
-        const refreshToken = jwt.sign(
-          { userId: user._id },
-          process.env.REFRESH_TOKEN_SECRET,
-          { expiresIn: '7d' }
-        );
-        
-        // Save session
-        await Session.create({
-          userId: user._id,
-          refreshToken: await bcrypt.hash(refreshToken, 10),
-          deviceInfo,
-          ipAddress,
-          location: geo ? {
-            country: geo.country,
-            city: geo.city,
-            latitude: geo.ll[0],
-            longitude: geo.ll[1]
-          } : {},
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        });
-        
-        // Log successful login
-        await logLoginAttempt(
-          user._id, 
-          email, 
-          ipAddress, 
-          deviceInfo, 
-          geo, 
-          'success',
-          isSuspicious,
-          user.mfaEnabled
-        );
-        
-        // Set refresh token in HttpOnly cookie
-        res.cookie('refreshToken', refreshToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60 * 1000
-        });
-        
-        res.json({
-          accessToken,
-          user: {
-            id: user._id,
-            email: user.email,
-            username: user.username
-          }
-        });
-        
-      } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed' });
-      }
-};
+      };
+      
 
 const mfaSetupController = async (req, res) => {
     try {

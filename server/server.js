@@ -33,7 +33,7 @@ const server = async () => {
     app.use('/api/auth', authRoutes);
 
     // Error handling middleware
-    app.use((req, res, err, next) => {
+    app.use((err, req, res, next) => {
       console.error(err.stack);
       return res
         .status(500)
