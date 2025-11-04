@@ -19,7 +19,11 @@ const server = async () => {
     app.use(express.json());
     app.use(
       cors({
-        origin: ['http://localhost:5173', 'https://login-security-iota.vercel.app'],
+        origin: [
+          'http://localhost:5173',
+          'https://login-security-iota.vercel.app',
+          'http://localhost:4173',
+        ],
       })
     );
     await connectDB(DB_URI);

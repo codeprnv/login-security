@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import Session from '../models/Session.js';
 
-
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];

@@ -244,6 +244,7 @@ const Signup = () => {
                 <div className='relative'>
                   <Field
                     type={showPassword ? 'text' : 'password'}
+                    autocomplete='current-password'
                     id='password'
                     name='password'
                     placeholder='••••••••'
@@ -334,6 +335,7 @@ const Signup = () => {
                 </label>
                 <div className='relative'>
                   <Field
+                    autocomplete='current-password'
                     type={showConfirmPassword ? 'text' : 'password'}
                     id='confirmPassword'
                     name='confirmPassword'

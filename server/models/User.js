@@ -97,6 +97,8 @@ const UserSchema = new mongoose.Schema(
         browser: String,
         os: String,
         deviceType: String,
+        country: String,
+        city: String,
         lastSeen: {
           type: Date,
           default: Date.now,
@@ -170,7 +172,6 @@ UserSchema.methods.comparePassword = async function (candidatePassword) {
     throw new Error('Password comparison failed');
   }
 };
-
 
 // Method to check if password is expired
 UserSchema.methods.isPasswordExpired = function () {

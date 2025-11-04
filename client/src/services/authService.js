@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://login-security-s1s9.onrender.com/api/auth';
+const API_URL = `${import.meta.env.PROD ? import.meta.env.VITE_API_URL : import.meta.env.VITE_DEV_API_URL}/api/auth`;
 
 // Create axios instance with default config
 const authApi = axios.create({
@@ -9,7 +9,6 @@ const authApi = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
 
 export const registerUser = async (userData) => {
   try {
@@ -32,7 +31,6 @@ export const registerUser = async (userData) => {
     throw new Error(errorMessage);
   }
 };
-
 
 export const loginUser = async (email, password, mfaCode = null) => {
   try {
@@ -66,7 +64,6 @@ export const loginUser = async (email, password, mfaCode = null) => {
     throw new Error(errorMessage);
   }
 };
-
 
 /**
  * Logout user
